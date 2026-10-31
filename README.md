@@ -8,10 +8,10 @@ Traduz em tempo real o inglês que você está ouvindo:
 O inglês aparece enquanto a pessoa fala (cinza) e a tradução em português (negrito) sai logo que ela termina a frase.
 
 ## Como funciona (por que é preciso)
-1. **Transcrição:** áudio enviado em streaming (PCM 24 kHz) para o modelo `gpt-4o-transcribe` da OpenAI (Realtime API), com detecção de pausas e redução de ruído.
+1. **Transcrição:** áudio enviado em streaming (PCM 24 kHz) para o modelo `gpt-live-transcribe` da OpenAI (Realtime API), que devolve o texto enquanto a pessoa fala; o próprio app detecta as pausas para fechar cada frase.
 2. **Tradução:** cada frase é traduzida por um LLM (`gpt-4.1` por padrão) que recebe as **8 frases anteriores como contexto** — isso resolve pronomes, mantém a terminologia consistente, corrige palavras mal reconhecidas e evita tradução literal de expressões.
 
-Os modelos podem ser trocados na tela inicial (ex.: `gpt-4o-mini-transcribe` e `gpt-4.1-mini` para ficar mais rápido e barato).
+Os modelos podem ser trocados na tela inicial (ex.: `gpt-4.1-mini` para ficar mais rápido e barato).
 
 ## Requisitos
 - Android 10 ou superior.

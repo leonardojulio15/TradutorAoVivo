@@ -6,11 +6,12 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Transcrição em streaming (inglês) pela Realtime API da OpenAI, modo "transcription".
- * Áudio esperado: PCM 16-bit, mono, 24 kHz, little-endian.
+ * Transcrição em streaming (inglês) pela Realtime API (GA) da OpenAI, sessão do tipo "transcription".
+ * Áudio: PCM 16-bit, mono, 24 kHz. Os turnos são fechados pelo app com commit().
  */
 class RealtimeTranscriber(
     private val client: OkHttpClient,
@@ -22,7 +23,6 @@ class RealtimeTranscriber(
 
     interface Listener {
         fun onReady()
-        fun onSpeechStarted(itemId: String)
         fun onDelta(itemId: String, delta: String)
         fun onCompleted(itemId: String, text: String)
         fun onError(message: String)
@@ -32,12 +32,13 @@ class RealtimeTranscriber(
     @Volatile private var ws: WebSocket? = null
     @Volatile private var ready = false
     @Volatile private var closedByUs = false
+    @Volatile private var configLevel = 0     // 0 = completa, 1 = sem idioma/ruído (compatibilidade)
+    @Volatile private var gotTranscript = false
 
     fun connect() {
         val req = Request.Builder()
             .url("wss://api.openai.com/v1/realtime?intent=transcription")
             .header("Authorization", "Bearer $apiKey")
-            .header("OpenAI-Beta", "realtime=v1")
             .build()
         ws = client.newWebSocket(req, this)
     }
@@ -48,6 +49,9 @@ class RealtimeTranscriber(
         ws?.send("{\"type\":\"input_audio_buffer.append\",\"audio\":\"$b64\"}")
     }
 
+    fun commit() { if (ready) ws?.send("{\"type\":\"input_audio_buffer.commit\"}") }
+    fun clear() { if (ready) ws?.send("{\"type\":\"input_audio_buffer.clear\"}") }
+
     fun close() {
         closedByUs = true
         ready = false
@@ -55,28 +59,24 @@ class RealtimeTranscriber(
         ws = null
     }
 
-    override fun onOpen(webSocket: WebSocket, response: Response) {
+    private fun sessionUpdate(level: Int): String {
+        val transcription = JSONObject().put("model", model)
+        val input = JSONObject()
+            .put("format", JSONObject().put("type", "audio/pcm").put("rate", 24_000))
+            .put("transcription", transcription)
+            .put("turn_detection", JSONObject.NULL)
+        if (level == 0) {
+            transcription.put("languages", JSONArray().put("en"))
+            input.put("noise_reduction", JSONObject().put("type", if (farField) "far_field" else "near_field"))
+        }
         val session = JSONObject()
-            .put("input_audio_format", "pcm16")
-            .put(
-                "input_audio_transcription", JSONObject()
-                    .put("model", model)
-                    .put("language", "en")
-                    .put("prompt", "Live English speech. Transcribe verbatim with correct punctuation.")
-            )
-            .put(
-                "turn_detection", JSONObject()
-                    .put("type", "server_vad")
-                    .put("threshold", 0.5)
-                    .put("prefix_padding_ms", 300)
-                    // pausas curtas fecham a frase rápido -> tradução sai mais cedo
-                    .put("silence_duration_ms", 450)
-            )
-            .put(
-                "input_audio_noise_reduction",
-                JSONObject().put("type", if (farField) "far_field" else "near_field")
-            )
-        webSocket.send(JSONObject().put("type", "transcription_session.update").put("session", session).toString())
+            .put("type", "transcription")
+            .put("audio", JSONObject().put("input", input))
+        return JSONObject().put("type", "session.update").put("session", session).toString()
+    }
+
+    override fun onOpen(webSocket: WebSocket, response: Response) {
+        webSocket.send(sessionUpdate(configLevel))
         ready = true
         listener.onReady()
     }
@@ -84,16 +84,35 @@ class RealtimeTranscriber(
     override fun onMessage(webSocket: WebSocket, text: String) {
         val o = try { JSONObject(text) } catch (e: Exception) { return }
         when (o.optString("type")) {
-            "input_audio_buffer.speech_started" ->
-                listener.onSpeechStarted(o.optString("item_id"))
-            "conversation.item.input_audio_transcription.delta" ->
+            "conversation.item.input_audio_transcription.delta" -> {
+                gotTranscript = true
                 listener.onDelta(o.optString("item_id"), o.optString("delta"))
-            "conversation.item.input_audio_transcription.completed" ->
+            }
+            "conversation.item.input_audio_transcription.completed" -> {
+                gotTranscript = true
                 listener.onCompleted(o.optString("item_id"), o.optString("transcript").trim())
+            }
             "conversation.item.input_audio_transcription.failed" ->
                 listener.onError(o.optJSONObject("error")?.optString("message") ?: "falha na transcrição")
-            "error" ->
-                listener.onError(o.optJSONObject("error")?.optString("message") ?: text)
+            "error" -> {
+                val err = o.optJSONObject("error")
+                val msg = err?.optString("message") ?: text
+                val param = err?.optString("param").orEmpty()
+                val lower = msg.lowercase()
+                // Se a API recusar algum ajuste opcional, reenvia a configuração mínima.
+                if (configLevel == 0 && !gotTranscript &&
+                    (param.contains("languages") || param.contains("noise_reduction") ||
+                        lower.contains("languages") || lower.contains("noise_reduction") ||
+                        lower.contains("unknown parameter"))
+                ) {
+                    configLevel = 1
+                    webSocket.send(sessionUpdate(1))
+                    return
+                }
+                // commit de buffer vazio/curto não é problema real
+                if (lower.contains("buffer too small") || lower.contains("empty")) return
+                listener.onError(msg)
+            }
         }
     }
 

@@ -129,12 +129,30 @@ class TranslatorService : Service() {
 
         captureThread = Thread({
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
-            val buf = ByteArray(RATE * 2 / 10) // 100 ms de áudio
+            val vad = TurnDetector(internal)
+            val preRoll = ArrayDeque<ByteArray>()   // ~300 ms antes da fala, para não cortar o início
             try {
                 record.startRecording()
                 while (running) {
+                    val buf = ByteArray(RATE * 2 / 10) // 100 ms de áudio
                     val n = record.read(buf, 0, buf.size)
-                    if (n > 0) transcriber?.sendAudio(buf, n)
+                    if (n <= 0) continue
+                    val chunk = if (n == buf.size) buf else buf.copyOf(n)
+                    val t = transcriber
+                    when (vad.process(chunk, chunk.size)) {
+                        TurnDetector.Event.NONE -> {
+                            preRoll.addLast(chunk)
+                            while (preRoll.size > 3) preRoll.removeFirst()
+                        }
+                        TurnDetector.Event.START -> {
+                            preRoll.forEach { t?.sendAudio(it, it.size) }
+                            preRoll.clear()
+                            t?.sendAudio(chunk, chunk.size)
+                        }
+                        TurnDetector.Event.CONTINUE -> t?.sendAudio(chunk, chunk.size)
+                        TurnDetector.Event.END -> { t?.sendAudio(chunk, chunk.size); t?.commit() }
+                        TurnDetector.Event.DISCARD -> t?.clear()
+                    }
                 }
             } catch (e: Exception) {
                 TranscriptStore.setStatus("Erro no áudio: ${e.message}")
@@ -153,7 +171,6 @@ class TranslatorService : Service() {
                     retries = 0
                     TranscriptStore.setStatus(if (source == "internal") "Ouvindo o áudio do celular… 🎧" else "Ouvindo pelo microfone… 🎙️")
                 }
-                override fun onSpeechStarted(itemId: String) = TranscriptStore.onSpeechStarted(itemId)
                 override fun onDelta(itemId: String, delta: String) = TranscriptStore.onDelta(itemId, delta)
                 override fun onCompleted(itemId: String, text: String) {
                     TranscriptStore.onCompleted(itemId, text)

@@ -11,12 +11,25 @@ android {
         applicationId = "com.tradutorvivo"
         minSdk = 29          // Android 10+ (necessário para capturar o áudio interno)
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
+    // Chave fixa: permite instalar atualizações por cima da versão anterior
+    signingConfigs {
+        create("fixa") {
+            storeFile = file("tradutor.keystore")
+            storePassword = "tradutor123"
+            keyAlias = "tradutor"
+            keyPassword = "tradutor123"
+        }
+    }
     buildTypes {
-        release { isMinifyEnabled = false }
+        debug { signingConfig = signingConfigs.getByName("fixa") }
+        release {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("fixa")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
