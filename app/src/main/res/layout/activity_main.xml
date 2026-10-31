@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tradutor ao vivo  EN → PT"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:id="@+id/config"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <EditText
+            android:id="@+id/etKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Chave da API OpenAI (sk-…)"
+            android:inputType="textPassword"
+            android:importantForAutofill="no"
+            android:singleLine="true" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <EditText
+                android:id="@+id/etStt"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Modelo transcrição"
+                android:textSize="13sp"
+                android:importantForAutofill="no"
+                android:singleLine="true" />
+            <EditText
+                android:id="@+id/etMt"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Modelo tradução"
+                android:textSize="13sp"
+                android:importantForAutofill="no"
+                android:singleLine="true" />
+        </LinearLayout>
+
+        <RadioGroup
+            android:id="@+id/rgSource"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <RadioButton
+                android:id="@+id/rbMic"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🎙️ Microfone (ambiente)" />
+            <RadioButton
+                android:id="@+id/rbInternal"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="📱 Áudio do celular" />
+        </RadioGroup>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btnToggle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Iniciar" />
+        <Button
+            android:id="@+id/btnClear"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="Limpar" />
+        <Button
+            android:id="@+id/btnSmaller"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:minWidth="0dp"
+            android:text="A−" />
+        <Button
+            android:id="@+id/btnBigger"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:minWidth="0dp"
+            android:text="A+" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="4dp"
+        android:paddingBottom="8dp"
+        android:textSize="13sp"
+        android:alpha="0.75" />
+
+    <ScrollView
+        android:id="@+id/scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+        <TextView
+            android:id="@+id/tvOut"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:lineSpacingMultiplier="1.15"
+            android:textIsSelectable="true"
+            android:textSize="20sp" />
+    </ScrollView>
+</LinearLayout>
